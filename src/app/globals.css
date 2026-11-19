@@ -1,0 +1,102 @@
+@import "tailwindcss";
+@import "@heroui/styles";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* GEWIS look: red #D40000, light grey page, white bordered panels, 6px radius. */
+:root {
+  --radius: 0.375rem;
+
+  --background: oklch(0.97 0.0029 264.54);
+  --foreground: oklch(0.2475 0.0075 264);
+  --surface: oklch(1 0 0);
+  --surface-foreground: var(--foreground);
+  --surface-secondary: oklch(0.97 0.0029 264.54);
+  --muted: oklch(0.5575 0.0165 244.89);
+  --border: oklch(0.912 0.006 264);
+  --separator: oklch(0.93 0.005 264);
+
+  --accent: oklch(0.5463 0.2242 29.23);
+  --accent-foreground: oklch(1 0 0);
+  --focus: var(--accent);
+  --link: var(--accent);
+
+  --brand-bar: oklch(0.5463 0.2242 29.23);
+  --brand-bar-foreground: oklch(1 0 0);
+
+  /* Status colours for text on surfaces (WCAG AA contrast). */
+  --success-ink: oklch(0.5 0.13 150);
+  --warning-ink: oklch(0.53 0.12 65);
+}
+
+[data-theme="dark"] {
+  --background: oklch(0.2103 0.0059 285.89);
+  --foreground: oklch(0.9491 0 0);
+  --surface: oklch(0.1652 0.0062 285.7);
+  --surface-foreground: var(--foreground);
+  --surface-secondary: oklch(0.2103 0.0059 285.89);
+  --muted: oklch(0.705 0.015 286.067);
+  --border: oklch(0.28 0.006 286.033);
+  --separator: oklch(0.25 0.006 286.033);
+
+  --accent: oklch(0.5463 0.2242 29.23);
+  --accent-foreground: oklch(1 0 0);
+  --focus: oklch(0.673 0.2146 25.04);
+  --link: oklch(0.673 0.2146 25.04);
+
+  --brand-bar: oklch(0.1652 0.0062 285.7);
+  --brand-bar-foreground: oklch(0.9491 0 0);
+
+  --success-ink: oklch(0.78 0.16 150);
+  --warning-ink: oklch(0.83 0.13 76);
+}
+
+/* One radius scale for the whole app: controls 8px, containers 12px. */
+:root {
+  --field-radius: 0.5rem;
+  --field-border-width: 1px;
+  --field-border: oklch(0.87 0.006 264);
+  --surface-shadow: none;
+}
+
+[data-theme="dark"] {
+  --field-border: oklch(0.33 0.006 286);
+}
+
+@layer components {
+  .button {
+    border-radius: 0.5rem;
+  }
+  .card,
+  .alert,
+  .toast {
+    border-radius: 0.75rem;
+  }
+  .card {
+    border: 1px solid var(--border);
+  }
+  .chip {
+    border-radius: 0.375rem;
+  }
+  /* Every field in this app is required, so the asterisk is noise. */
+  .label::after {
+    content: none !important;
+  }
+}
+
+@theme inline {
+  --color-brand-bar: var(--brand-bar);
+  --color-brand-bar-foreground: var(--brand-bar-foreground);
+  --color-success-ink: var(--success-ink);
+  --color-warning-ink: var(--warning-ink);
+  --font-sans:
+    system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", Arial, sans-serif;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+}

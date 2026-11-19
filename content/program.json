@@ -1,0 +1,85 @@
+{
+  "plenary": [
+    {
+      "key": "walk-in",
+      "title": "Walk-in & coffee",
+      "location": "Foyer",
+      "startsAt": "2027-03-17T09:30:00+01:00",
+      "endsAt": "2027-03-17T10:00:00+01:00"
+    },
+    {
+      "key": "opening",
+      "title": "Opening",
+      "location": "Main hall",
+      "startsAt": "2027-03-17T10:00:00+01:00",
+      "endsAt": "2027-03-17T10:20:00+01:00"
+    },
+    {
+      "key": "lunch",
+      "title": "Lunch",
+      "location": "Foyer",
+      "startsAt": "2027-03-17T12:15:00+01:00",
+      "endsAt": "2027-03-17T13:15:00+01:00"
+    },
+    {
+      "key": "panel",
+      "title": "Panel discussion",
+      "location": "Main hall",
+      "startsAt": "2027-03-17T15:15:00+01:00",
+      "endsAt": "2027-03-17T16:00:00+01:00"
+    },
+    {
+      "key": "drinks",
+      "title": "Closing drinks",
+      "location": "Foyer",
+      "startsAt": "2027-03-17T16:00:00+01:00",
+      "endsAt": "2027-03-17T17:30:00+01:00"
+    }
+  ],
+  "speakers": [
+    {
+      "slug": "speaker-a",
+      "name": "Dr. Anna de Vries",
+      "affiliation": "Eindhoven University of Technology",
+      "talkTitle": "The quiet algorithms behind everyday life",
+      "abstract": "From route planning to spam filters: a tour of elegant algorithms that run unnoticed in the systems we use every day.",
+      "sessions": [
+        { "key": "speaker-a-1", "location": "Room 1", "capacity": 60, "startsAt": "2027-03-17T10:30:00+01:00", "endsAt": "2027-03-17T11:15:00+01:00" },
+        { "key": "speaker-a-2", "location": "Room 2", "capacity": 40, "startsAt": "2027-03-17T13:15:00+01:00", "endsAt": "2027-03-17T14:00:00+01:00" }
+      ]
+    },
+    {
+      "slug": "speaker-b",
+      "name": "Prof. Mark Jansen",
+      "affiliation": "Utrecht University",
+      "talkTitle": "Proofs nobody reads, and why they matter",
+      "abstract": "Formal verification has quietly become part of industrial software. What does it take to prove that code is correct?",
+      "sessions": [
+        { "key": "speaker-b-1", "location": "Room 2", "capacity": 40, "startsAt": "2027-03-17T10:30:00+01:00", "endsAt": "2027-03-17T11:15:00+01:00" },
+        { "key": "speaker-b-2", "location": "Room 1", "capacity": 60, "startsAt": "2027-03-17T14:15:00+01:00", "endsAt": "2027-03-17T15:00:00+01:00" }
+      ]
+    },
+    {
+      "slug": "speaker-c",
+      "name": "Sara Bakker, MSc",
+      "affiliation": "Industry speaker",
+      "talkTitle": "Finding signal in noisy data",
+      "abstract": "Lessons from building statistical models on real-world data, where the most valuable insights are rarely the obvious ones.",
+      "sessions": [
+        { "key": "speaker-c-1", "location": "Room 1", "capacity": 60, "startsAt": "2027-03-17T11:30:00+01:00", "endsAt": "2027-03-17T12:15:00+01:00" },
+        { "key": "speaker-c-2", "location": "Room 2", "capacity": 40, "startsAt": "2027-03-17T14:15:00+01:00", "endsAt": "2027-03-17T15:00:00+01:00" }
+      ]
+    },
+    {
+      "slug": "speaker-d",
+      "name": "Dr. Tom Hendriks",
+      "affiliation": "Radboud University",
+      "talkTitle": "Cryptography in plain sight",
+      "abstract": "How modern cryptography protects every message you send, and the mathematical gems that make it possible.",
+      "sessions": [
+        { "key": "speaker-d-1", "location": "Room 2", "capacity": 40, "startsAt": "2027-03-17T11:30:00+01:00", "endsAt": "2027-03-17T12:15:00+01:00" },
+        { "key": "speaker-d-2", "location": "Room 1", "capacity": 60, "startsAt": "2027-03-17T13:15:00+01:00", "endsAt": "2027-03-17T14:00:00+01:00" }
+      ]
+    }
+  ]
+}
