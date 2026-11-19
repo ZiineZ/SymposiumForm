@@ -3,7 +3,7 @@ import type { DB } from "@/db/client";
 import { adminLoginAttempt } from "@/db/schema";
 
 export const THROTTLE = {
-  windowMs: 15 * 60 * 1000,
+  windowMs: 5 * 60 * 1000,
   perClient: 5,
   global: 50,
 } as const;

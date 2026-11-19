@@ -17,7 +17,7 @@ Sign-up site for the GEWIS Lustrum Symposium (*Hidden Gems*, Evoluon). Attendees
 ```bash
 npm install
 cp .env.example .env.local          # fill in BETTER_AUTH_SECRET (openssl rand -base64 48)
-npm run admin:credentials           # paste the two ADMIN_ lines into .env.local
+npm run admin:credentials -- --save  # writes the two ADMIN_ hashes into .env.local
 npm run db:migrate
 npm run program:seed                # optional: load content/program.json
 npm run dev
@@ -32,7 +32,7 @@ There is one admin login, separate from attendee accounts and without an email a
 - `npm run admin:credentials` generates a random 32-character username and 32-character password, prints them **once**, and prints two environment variables: `ADMIN_USERNAME_SHA256` and `ADMIN_PASSWORD_HASH`. Store the username and password in a password manager. Only the hashes go into the environment, so neither can be recovered from the server.
 - To change them, run the script again and replace both variables.
 - Sessions last at most 8 hours and end after 30 minutes of inactivity. The cookie is `HttpOnly`, `SameSite=Strict` and `__Host-` prefixed in production.
-- Sign-in is limited to 5 attempts per client and 50 in total per 15 minutes.
+- Sign-in is limited to 5 attempts per client and 50 in total per 5 minutes.
 - Every admin change is logged as an `[admin]` line on stdout.
 
 ## Managing data

@@ -73,7 +73,7 @@ export async function adminSignIn(fd: FormData): Promise<AdminResult> {
     parsed.success ? parsed.data.password : "",
   );
   if (result === "ok" && parsed.success) redirect("/admin");
-  if (result === "throttled") return fail("Too many attempts. Try again in 15 minutes.");
+  if (result === "throttled") return fail("Too many attempts. Try again in 5 minutes.");
   if (result === "disabled") return fail("Admin sign-in is not configured.");
   return fail("Incorrect username or password.");
 }
