@@ -2,7 +2,8 @@ import { and, count, eq } from "drizzle-orm";
 import type { DB } from "@/db/client";
 import { enrollment, timeslot } from "@/db/schema";
 
-export type RegistrationWindow = { opensAt: Date; closesAt?: Date };
+/** `opensAt: null` means subscriptions have not been scheduled to open. */
+export type RegistrationWindow = { opensAt: Date | null; closesAt?: Date };
 
 export type EnrollmentError =
   | "closed"
@@ -16,7 +17,7 @@ export type EnrollmentError =
 export type EnrollmentResult = { ok: true } | { ok: false; error: EnrollmentError };
 
 export function isRegistrationOpen(window: RegistrationWindow, now: Date): boolean {
-  if (now < window.opensAt) return false;
+  if (!window.opensAt || now < window.opensAt) return false;
   if (window.closesAt && now >= window.closesAt) return false;
   return true;
 }

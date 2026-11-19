@@ -12,12 +12,13 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file-if-exists=.env.local scripts/migrate.ts",
     "program:seed": "tsx --env-file-if-exists=.env.local scripts/seed-program.ts",
-    "attendees:import": "tsx --env-file-if-exists=.env.local scripts/import-attendees.ts"
+    "admin:credentials": "tsx scripts/admin-credentials.mts"
   },
   "dependencies": {
     "@gravity-ui/icons": "^2.23.1",
     "@heroui/react": "^3.2.7",
     "@heroui/styles": "^3.2.7",
+    "@internationalized/date": "^3.12.4",
     "better-auth": "^1.7.26",
     "better-sqlite3": "^13.2.0",
     "drizzle-orm": "^0.45.4",

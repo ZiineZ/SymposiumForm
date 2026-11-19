@@ -91,12 +91,6 @@ export const rateLimit = sqliteTable("rate_limit", {
 /* Symposium tables                                                            */
 /* -------------------------------------------------------------------------- */
 
-/** E-mail addresses registered for the symposium on gewis.nl (lower-case). */
-export const attendee = sqliteTable("attendee", {
-  email: text("email").primaryKey(),
-  createdAt: timestamp("created_at").notNull().default(now),
-});
-
 export const speaker = sqliteTable("speaker", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   slug: text("slug").notNull().unique(),
@@ -150,3 +144,63 @@ export const agendaItem = sqliteTable("agenda_item", {
   endsAt: timestamp("ends_at").notNull(),
   location: text("location").notNull(),
 });
+
+/* -------------------------------------------------------------------------- */
+/* Access and administration                                                   */
+/* -------------------------------------------------------------------------- */
+
+/** Account-creation link. Only the SHA-256 of the token is stored. */
+export const invite = sqliteTable("invite", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  tokenHash: text("token_hash").notNull().unique(),
+  label: text("label").notNull(),
+  createdAt: timestamp("created_at").notNull().default(now),
+  expiresAt: timestamp("expires_at").notNull(),
+  maxUses: integer("max_uses"),
+  uses: integer("uses").notNull().default(0),
+  revokedAt: timestamp("revoked_at"),
+});
+
+/** Admin sessions. `id` is the SHA-256 of the cookie token. */
+export const adminSession = sqliteTable("admin_session", {
+  id: text("id").primaryKey(),
+  createdAt: timestamp("created_at").notNull().default(now),
+  expiresAt: timestamp("expires_at").notNull(),
+  lastSeenAt: timestamp("last_seen_at").notNull(),
+  userAgent: text("user_agent"),
+});
+
+/** Failed admin sign-ins per client (and one global key), per fixed window. */
+export const adminLoginAttempt = sqliteTable("admin_login_attempt", {
+  key: text("key").primaryKey(),
+  count: integer("count").notNull(),
+  windowStart: integer("window_start").notNull(),
+});
+
+/** Single-row table (id = 1) with settings the admin can change. */
+export const setting = sqliteTable("setting", {
+  id: integer("id").primaryKey(),
+  registrationOpensAt: timestamp("registration_opens_at"),
+  registrationClosesAt: timestamp("registration_closes_at"),
+});
+
+export const notification = sqliteTable("notification", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at").notNull().default(now),
+});
+
+export const notificationRead = sqliteTable(
+  "notification_read",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    notificationId: integer("notification_id")
+      .notNull()
+      .references(() => notification.id, { onDelete: "cascade" }),
+    readAt: timestamp("read_at").notNull().default(now),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.notificationId] })],
+);

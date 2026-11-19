@@ -5,9 +5,9 @@ import { APIError } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
-import { isRegisteredAttendee } from "./attendees";
 import { EVENT } from "./event";
 import { env } from "./env";
+import { consumeInvite } from "./invites";
 import { sendInBackground } from "./mail";
 
 export const auth = betterAuth({
@@ -92,27 +92,26 @@ export const auth = betterAuth({
   advanced: {
     useSecureCookies: env.NODE_ENV === "production",
     cookiePrefix: "symposium",
+    // Traefik on the GEWIS cluster sets a trustworthy X-Real-Ip (see src/lib/client-ip.ts).
+    ipAddress: { ipAddressHeaders: ["x-real-ip", "x-forwarded-for"] },
   },
 
   databaseHooks: {
     user: {
       create: {
-        // Only people registered for the symposium on gewis.nl may create an account.
-        before: async (user) => {
-          const email = user.email.trim().toLowerCase();
-          if (!isRegisteredAttendee(email)) {
-            // Better Auth answers this sign-up with a generic success so the form
-            // never reveals who is registered. The explanation goes by email.
-            sendInBackground({
-              to: email,
-              subject: `Your ${EVENT.name} account`,
-              text: `Hi,\n\nSomeone tried to create an account for ${EVENT.name} with this email address, but it is not registered for the symposium.\n\nSign up for the symposium on ${EVENT.gewisUrl} first, then create your account with the same email address. Registrations are synchronised periodically, so it may take a while before you can create your account.\n\nIf this wasn't you, you can ignore this email.`,
-            });
-            throw new APIError("FORBIDDEN", {
-              message: "This email address is not registered for the symposium.",
+        // Accounts can only be created through sign-up with a valid invite link.
+        // The token travels in a header; using it up is one atomic UPDATE.
+        before: async (user, ctx) => {
+          const token = ctx?.headers?.get("x-invite-token") ?? "";
+          if (ctx?.path !== "/sign-up/email" || !consumeInvite(db, token)) {
+            throw new APIError("BAD_REQUEST", {
+              code: "INVALID_INVITE",
+              message: "This invite link is invalid or has expired.",
             });
           }
-          return { data: { ...user, email, name: user.name.trim().slice(0, 100) } };
+          return {
+            data: { ...user, email: user.email.trim().toLowerCase(), name: user.name.trim().slice(0, 100) },
+          };
         },
       },
     },

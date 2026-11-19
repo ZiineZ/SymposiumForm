@@ -5,7 +5,7 @@ import { useState } from "react";
 import { AuthCard, FormAlert, TextLink, authErrorMessage } from "@/components/auth-ui";
 import { authClient } from "@/lib/auth-client";
 
-export default function RegisterPage() {
+export function JoinForm({ token }: { token: string }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sentTo, setSentTo] = useState<string | null>(null);
@@ -22,6 +22,7 @@ export default function RegisterPage() {
       email,
       password: String(data.get("password") ?? ""),
       callbackURL: "/login",
+      fetchOptions: { headers: { "x-invite-token": token } },
     });
 
     setPending(false);
@@ -49,7 +50,6 @@ export default function RegisterPage() {
   return (
     <AuthCard
       title="Create account"
-      description="Use the email address you registered with on gewis.nl."
       footer={
         <>
           Already have an account? <TextLink href="/login">Sign in</TextLink>

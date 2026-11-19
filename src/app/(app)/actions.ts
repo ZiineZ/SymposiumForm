@@ -5,7 +5,8 @@ import { z } from "zod";
 import { db } from "@/db";
 import { getCurrentUser } from "@/lib/dal";
 import { enroll, unenroll, type EnrollmentError } from "@/lib/enrollment";
-import { registrationWindow } from "@/lib/registration";
+import { markNotificationsRead } from "@/lib/notifications";
+import { getRegistrationWindow } from "@/lib/settings";
 
 export type ActionResult = { ok: true } | { ok: false; message: string };
 
@@ -34,7 +35,7 @@ async function run(
   const id = TimeslotId.safeParse(timeslotId);
   if (!id.success) return { ok: false, message: MESSAGES.invalid };
 
-  const result = op(db, user.id, id.data, registrationWindow);
+  const result = op(db, user.id, id.data, getRegistrationWindow());
   revalidatePath("/", "layout");
   return result.ok ? { ok: true } : { ok: false, message: MESSAGES[result.error] };
 }
@@ -45,4 +46,16 @@ export async function subscribe(timeslotId: number): Promise<ActionResult> {
 
 export async function unsubscribe(timeslotId: number): Promise<ActionResult> {
   return run(timeslotId, unenroll);
+}
+
+const NotificationIds = z.array(z.number().int().positive()).max(100);
+
+export async function markRead(ids: number[]): Promise<ActionResult> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, message: MESSAGES.unauthorized };
+  const parsed = NotificationIds.safeParse(ids);
+  if (!parsed.success) return { ok: false, message: MESSAGES.invalid };
+  markNotificationsRead(user.id, parsed.data);
+  revalidatePath("/", "layout");
+  return { ok: true };
 }

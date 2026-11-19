@@ -76,6 +76,8 @@ export function authErrorMessage(error: AuthError, fallback = "Something went wr
       return "Password is too long.";
     case "INVALID_TOKEN":
       return "This link is invalid or has expired.";
+    case "INVALID_INVITE":
+      return "This invite link is invalid or has expired. Ask the organisers for a new one.";
   }
   if (error.status === 403 && error.message) return error.message;
   return fallback;

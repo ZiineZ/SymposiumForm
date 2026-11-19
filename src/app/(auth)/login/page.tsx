@@ -10,9 +10,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   if (access.status === "ok") redirect("/");
 
   const { error } = await searchParams;
-  let notice: string | undefined;
-  if (access.status === "unregistered") notice = "This email address is no longer registered for the symposium.";
-  else if (error) notice = "This link is invalid or has expired. Sign in to receive a new one.";
+  const notice = error ? "This link is invalid or has expired. Sign in to receive a new one." : undefined;
 
   return <LoginForm notice={notice} />;
 }

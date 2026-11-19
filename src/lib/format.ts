@@ -24,3 +24,6 @@ export const formatTime = (d: Date) => time.format(d);
 export const formatTimeRange = (a: Date, b: Date) => `${time.format(a)} – ${time.format(b)}`;
 export const formatDay = (d: Date) => day.format(d);
 export const formatDateTime = (d: Date) => dateTime.format(d);
+
+const shortDay = new Intl.DateTimeFormat(locale, { timeZone: tz, weekday: "short", day: "numeric", month: "short" });
+export const formatShortDay = (d: Date) => shortDay.format(d);

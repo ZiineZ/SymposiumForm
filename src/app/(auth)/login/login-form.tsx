@@ -35,11 +35,7 @@ export function LoginForm({ notice }: { notice?: string }) {
   return (
     <AuthCard
       title="Sign in"
-      footer={
-        <>
-          No account yet? <TextLink href="/register">Create one</TextLink>
-        </>
-      }
+      footer="No account yet? Use the link from your invitation email."
     >
       <Form className="flex flex-col gap-4" onSubmit={onSubmit}>
         {(error || notice) && <FormAlert>{error ?? notice}</FormAlert>}

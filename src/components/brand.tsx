@@ -1,23 +1,45 @@
 import Link from "next/link";
+import { EVENT } from "@/lib/event";
 
-export function Brand() {
+export function Brand({ homeHref = "/" }: { homeHref?: string }) {
   return (
-    <Link
-      href="/"
-      className="flex items-center gap-2.5 rounded-sm text-brand-bar-foreground outline-none focus-visible:ring-2 focus-visible:ring-white/70"
-    >
-      <span className="text-lg font-extrabold tracking-tight">GEWIS</span>
-      <span aria-hidden className="h-5 w-px bg-current opacity-40" />
-      <span className="text-sm font-medium opacity-95">Lustrum Symposium</span>
-    </Link>
+    <div className="flex items-center gap-3 text-brand-bar-foreground">
+      <a
+        href={EVENT.gewisUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="GEWIS website (opens in a new tab)"
+        className="shrink-0 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- static SVG, no optimisation needed */}
+        <img src="/gewis-logo.svg" alt="GEWIS" width={44} height={44} className="size-11" />
+      </a>
+      <span aria-hidden className="h-6 w-px bg-current opacity-40" />
+      <Link
+        href={homeHref}
+        className="rounded-sm text-sm font-semibold tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-white/70 sm:text-base"
+      >
+        Lustrum Symposium
+      </Link>
+    </div>
   );
 }
 
-export function BrandBar({ children }: { children?: React.ReactNode }) {
+export function BrandBar({
+  children,
+  wide = false,
+  homeHref,
+}: {
+  children?: React.ReactNode;
+  wide?: boolean;
+  homeHref?: string;
+}) {
   return (
     <header className="bg-brand-bar text-brand-bar-foreground shadow-md">
-      <div className="mx-auto flex h-16 max-w-4xl items-center justify-between gap-4 px-4 sm:px-6">
-        <Brand />
+      <div
+        className={`mx-auto flex h-16 items-center justify-between gap-4 px-4 sm:px-6 ${wide ? "max-w-6xl" : "max-w-4xl"}`}
+      >
+        <Brand homeHref={homeHref} />
         {children}
       </div>
     </header>
