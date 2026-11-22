@@ -1,0 +1,14 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: symposium
+spec:
+  entryPoints:
+    - websecure
+  tls: {}
+  routes:
+    - match: Host(`symposium.gewis.nl`)
+      kind: Rule
+      services:
+        - name: symposium
+          port: 80

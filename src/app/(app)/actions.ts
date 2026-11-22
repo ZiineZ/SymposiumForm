@@ -35,7 +35,7 @@ async function run(
   const id = TimeslotId.safeParse(timeslotId);
   if (!id.success) return { ok: false, message: MESSAGES.invalid };
 
-  const result = op(db, user.id, id.data, getRegistrationWindow());
+  const result = await op(db, user.id, id.data, await getRegistrationWindow());
   revalidatePath("/", "layout");
   return result.ok ? { ok: true } : { ok: false, message: MESSAGES[result.error] };
 }
@@ -55,7 +55,7 @@ export async function markRead(ids: number[]): Promise<ActionResult> {
   if (!user) return { ok: false, message: MESSAGES.unauthorized };
   const parsed = NotificationIds.safeParse(ids);
   if (!parsed.success) return { ok: false, message: MESSAGES.invalid };
-  markNotificationsRead(user.id, parsed.data);
+  await markNotificationsRead(user.id, parsed.data);
   revalidatePath("/", "layout");
   return { ok: true };
 }

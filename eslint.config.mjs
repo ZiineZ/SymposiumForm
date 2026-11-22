@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Generated: bundled scripts for the container image.
+    "dist/**",
   ]),
 ]);
 

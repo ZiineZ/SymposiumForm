@@ -7,7 +7,8 @@ const transport = env.SMTP_HOST
       host: env.SMTP_HOST,
       port: env.SMTP_PORT,
       secure: env.SMTP_PORT === 465,
-      requireTLS: env.SMTP_PORT !== 465,
+      // Always STARTTLS in production; the local Mailpit catcher speaks plain SMTP.
+      requireTLS: env.NODE_ENV === "production" && env.SMTP_PORT !== 465,
       auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS } : undefined,
     })
   : null;

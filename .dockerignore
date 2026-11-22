@@ -1,0 +1,16 @@
+.git
+.github
+.claude
+.next
+node_modules
+dist
+data
+coverage
+.env*
+!.env.example
+deploy
+docs
+*.md
+compose.yaml
+Dockerfile
+.dockerignore

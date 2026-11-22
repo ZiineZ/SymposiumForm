@@ -1,70 +1,51 @@
 # Deploying on GEWIS infrastructure
 
-Findings from reading `GEWIS/infra`, `GEWIS/k8s-apps`, `GEWIS/cbc-deployments`, `GEWIS/gelift-tracker` and `GEWIS/radix` (November 2026). Nothing here has been confirmed with the CBC yet.
+Based on `GEWIS/infra`, `GEWIS/k8s-apps`, `GEWIS/cbc-deployments` and `GEWIS/gelift-tracker`, and confirmed by the CBC (Victor Klomp) on 19 November 2026.
+
+## Agreed with the CBC
+
+| Topic | Answer |
+| --- | --- |
+| Template | Follow `gelift-tracker`. No committee folder needed; the CBC may add a "misc" folder later. |
+| Repository and image | `ZiineZ/SymposiumForm` and an image on the personal GHCR are fine. |
+| Our responsibility | Only a deploy folder in this repo. `infra` and `k8s-apps` belong to the CBC, but PRs there are welcome. |
+| Database | The CBC recommends the **old** Postgres server (most apps still run there), debuggable through `pgadmin.gewis.nl`. The cluster Postgres works and is backed up, but has no debugging interface yet. |
+| SMTP | A service account on `smtp.gewis.nl` with send rights on `lustrumsymposium@gewis.nl`. The login user differs from the sender address. |
+| Hostname | `symposium.gewis.nl`. DNS is handled by the CBC. |
+| Environments | Production only (`symposium-prod`). |
+| Sealing secrets | The sealing certificate is at `https://sealed-secrets.gewis.nl/v1/cert.pem` (campus Wi-Fi or eduVPN only). |
+| Team access | The CBC arranges Kite/kubectl access to the namespace. |
+| Client IP | Trust `X-Real-Ip` (already the case). |
+| Containers | No requirements for non-root, limits or probes. Logs do not need to go to Grafana. |
+| Migrations | Run them before the app starts (Job or init container), like most ABC projects. |
+| GEWIS login (Keycloak) | Only for active members for now, so not usable for attendees. Attendees keep email + password accounts created through invite links. |
+
+## Still open
+
+- **Old Postgres:** host name, port, database name and credentials, and whether TLS is required.
+- **SMTP:** the service account's username and password.
 
 ## How GEWIS runs apps
 
-- **Cluster:** a 3-node Talos Kubernetes cluster, managed by the CBC through Flux (GitOps). Ingress is Traefik, TLS comes from a cert-manager wildcard (`*.gewis.nl`, `*.test.gewis.nl`), and external-dns writes DNS records to Cloudflare.
-- **Registering an app:** every app is a folder in `GEWIS/k8s-apps` with three parts:
-  - `source.yaml`: a Flux `GitRepository` pointing at the app's repo
-  - `prod.yaml`: a Flux `Kustomization` with the manifest path, `targetNamespace: <app>-prod` and the namespace itself
-  - `rbac-prod/`: a scoped `app-deployer` Role
-- **Where manifests live:** in the app's own repo. Flux applies them as `app-deployer`, which may only create deployments, services, configmaps, secrets, PVCs, jobs/cronjobs, Traefik `IngressRoute`/`Middleware`, `SealedSecret`, `SecretStore`/`ExternalSecret`, certificates, HPA, PDB and NetworkPolicy.
-- **Closest template: `gelift-tracker`.** It has its own repo, a GHCR image built by GitHub Actions (`ghcr.io/gewis/gelift-tracker`), Kustomize under `deploy/kustomize/{base,overlays}`, a SealedSecret for its credentials, and a top-level entry in `k8s-apps`.
-- **Secrets:**
-  - App secrets are `SealedSecret`s, sealed with the cert from `https://sealed-secrets.gewis.nl/v1/cert.pem` (reachable from the GEWIS network only).
-  - Generated credentials (Postgres, Keycloak clients, S3) live in OpenBao. The namespace reads them through a `SecretStore` + `ExternalSecret`.
-- **Pod security:** Talos enforces the PSA `baseline` profile. The container must run as non-root, with no hostPath volumes.
-- **Logs and metrics:** Alloy collects pod stdout into the LGTM stack (Grafana). The stack is split into separate tenants.
-- **Team access:** Kite UI and `kubectl` over NetBird. Both are granted per AD group in `infra/flux/50_apps/kite/app-access.yaml`.
+- **Cluster:** a 3-node Talos Kubernetes cluster, managed by the CBC through Flux (GitOps). Ingress is Traefik with a cert-manager wildcard certificate for `*.gewis.nl`.
+- **Registering an app:** a folder in `GEWIS/k8s-apps` with `source.yaml` (a Flux `GitRepository` pointing at the app's repo), `prod.yaml` (a Flux `Kustomization` with the manifest path and `targetNamespace`) and `rbac-prod/` (a scoped `app-deployer` Role). The CBC adds this; we can send it as a PR.
+- **Manifests:** live in the app's repo. Flux applies them as `app-deployer`, which may create deployments, services, configmaps, secrets, PVCs, jobs/cronjobs, Traefik `IngressRoute`/`Middleware`, `SealedSecret`, `SecretStore`/`ExternalSecret`, certificates, HPA, PDB and NetworkPolicy.
+- **Pod security:** Talos enforces the PSA `baseline` profile, so no hostPath volumes or privileged containers.
 
-## Postgres
+## Sign-ups
 
-- **Server:** one shared CloudNativePG cluster at **`postgres.net.gewis.nl:5432`**. TLS is mandatory and clients use `sslmode=verify-full`; it's a Let's Encrypt certificate, so the system CAs are enough.
-- **Getting a database:** the CBC adds one line to `infra/terraform/40_databases/postgres.tf`:
-  ```hcl
-  symposium = { namespace = "symposium-prod" }
-  ```
-- **What that line creates:**
-  - the role and the database
-  - a password in OpenBao at `postgres/symposium-prod/symposium`, with fields `username`, `password`, `dbname`, `host` and `port`
-  - the Kubernetes auth role `postgres-symposium-prod`
-- **Reading it from the app:** the same way as `cbc-deployments/mattermost/postgres-external-secret.yaml`, templated into a `DATABASE_URL`.
-- **Backups:** handled by the cluster (Barman to S3).
-- **Possible self-service:** the `app-deployer` Role also allows a `databases.gewis.nl/PostgresDatabase` CRD. That may become a self-service alternative; ask the CBC.
+GEWIS's privacy policy does not allow sharing the sign-up emails through the radix API. When sign-ups on gewis.nl close, the organisers email everyone an invite link made in the admin dashboard. Only invite links let people create an account.
 
-## SMTP
+## What is done in this app
 
-- **Server:** other apps send through **`smtp.gewis.nl:587`** with STARTTLS and SMTP auth. Mattermost does this, with its credentials in its SealedSecret.
-- **To ask for:** an SMTP account and a sender address, for example `symposium@gewis.nl`. SPF and DKIM for `gewis.nl` stay with GEWIS.
+- **Database:** Postgres (Drizzle `node-postgres`, Better Auth `provider: "pg"`). Seat booking locks the user and session rows; tests run on PGlite.
+- **Mail:** `SMTP_USER` is the service account, `MAIL_FROM` is `lustrumsymposium@gewis.nl` (set in the overlay).
+- **Container:** standalone Next.js image on GHCR, non-root, read-only root filesystem; `/api/health` and `/api/ready` probes.
+- **Migrations:** the `migrate` init container runs `node dist/migrate.mjs` before each new pod.
+- **Manifests:** `deploy/kustomize` (base + `overlays/production`), with the IngressRoute for `symposium.gewis.nl` and a sealing script. See `deploy/kustomize/README.md`.
 
-## Sign-ups (decided)
+## Still to do
 
-GEWIS's privacy policy does not allow sharing the sign-up emails through the radix API. Instead:
-
-- When sign-ups on gewis.nl close, the organisers email everyone an **invite link**. Only that link lets people create an account.
-- Links are made in the admin dashboard. Each one has an expiry date and an optional maximum number of uses, and can be revoked. The admin can make more links later, for example for late sign-ups.
-- So the site needs nothing from radix, and no attendee data is copied from GEWIS.
-
-## Networking details that affect the app
-
-- **Ingress:** a Traefik `IngressRoute` on entryPoint `websecure` with `tls: {}`, which uses the shared wildcard certificate. Public DNS needs the annotation `external-dns.alpha.kubernetes.io/target: router02.net.gewis.nl` on the route.
-- **Client IP:**
-  - Traefik replaces any client-sent `X-Forwarded-For`, but the TU/e WAF in front may pass a client-controlled chain.
-  - GEWIS's own `real-ip` plugin always sets a trustworthy **`X-Real-Ip`**.
-  - Better Auth's rate limiter must read `x-real-ip`, not `x-forwarded-for`.
-
-## What changes in this app (later, once agreed)
-
-- **Database:** SQLite → Postgres.
-  - Drizzle `pg` driver, Better Auth adapter `provider: "pg"`, migrations regenerated.
-  - Enrollment locks the timeslot row (`SELECT … FOR UPDATE`) instead of SQLite's `IMMEDIATE` transaction.
-  - Tests run against Postgres.
-- **Migrations:** a Kubernetes `Job` or init container runs them before the app starts.
-- **Container:** `output: "standalone"`, a non-root `Dockerfile`, a `/api/health` endpoint for the probes, and a GitHub Action publishing to GHCR.
-- **Manifests:** `deploy/kustomize`, following `gelift-tracker`:
-  - Deployment, Service and IngressRoute
-  - SealedSecret holding `BETTER_AUTH_SECRET`, the SMTP credentials and the admin hashes (`ADMIN_USERNAME_SHA256`, `ADMIN_PASSWORD_HASH`)
-  - Postgres SecretStore + ExternalSecret
-- **Better Auth:** the production `BETTER_AUTH_URL`. (Client IPs are already read from `X-Real-Ip`.)
-- **Programme data:** seeded with a Job, or the seed script run through `kubectl exec`.
+- Fill in and seal the secrets once the CBC has sent the database and SMTP credentials.
+- Make the GHCR package public.
+- PR to `GEWIS/k8s-apps` registering `deploy/kustomize/overlays/production` with `targetNamespace: symposium-prod`.

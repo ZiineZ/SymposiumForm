@@ -4,6 +4,6 @@ import { SpeakersAdmin } from "./speakers-admin";
 
 export const metadata: Metadata = { title: "Speakers" };
 
-export default function AdminSpeakersPage() {
-  return <SpeakersAdmin speakers={getAdminSpeakers()} />;
+export default async function AdminSpeakersPage() {
+  return <SpeakersAdmin speakers={await getAdminSpeakers()} />;
 }

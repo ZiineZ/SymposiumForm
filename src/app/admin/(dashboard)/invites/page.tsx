@@ -5,10 +5,10 @@ import { InvitesAdmin } from "./invites-admin";
 
 export const metadata: Metadata = { title: "Invites" };
 
-export default function AdminInvitesPage() {
+export default async function AdminInvitesPage() {
   return (
     <InvitesAdmin
-      invites={getAdminInvites()}
+      invites={await getAdminInvites()}
       defaultExpiry={localInputInDays(14)}
     />
   );

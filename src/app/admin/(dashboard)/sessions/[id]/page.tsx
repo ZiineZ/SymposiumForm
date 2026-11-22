@@ -10,7 +10,7 @@ export default async function AdminSessionPage({ params }: PageProps<"/admin/ses
   const slotId = Number(id);
   if (!Number.isSafeInteger(slotId) || slotId <= 0) notFound();
 
-  const session = getSessionDetail(slotId);
+  const session = await getSessionDetail(slotId);
   if (!session) notFound();
 
   return <SessionSubscribers session={session} />;

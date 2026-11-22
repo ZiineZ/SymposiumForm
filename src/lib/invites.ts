@@ -20,14 +20,17 @@ export function inviteStatus(
 }
 
 /** Creates an invite and returns its token. Only the hash is stored, so the token is shown once. */
-export function createInvite(
+export async function createInvite(
   db: DB,
   input: { label: string; expiresAt: Date; maxUses: number | null },
-): string {
+): Promise<string> {
   const token = randomBytes(32).toString("base64url");
-  db.insert(invite)
-    .values({ tokenHash: hashToken(token), label: input.label, expiresAt: input.expiresAt, maxUses: input.maxUses })
-    .run();
+  await db.insert(invite).values({
+    tokenHash: hashToken(token),
+    label: input.label,
+    expiresAt: input.expiresAt,
+    maxUses: input.maxUses,
+  });
   return token;
 }
 
@@ -39,24 +42,22 @@ function usable(now: Date) {
   );
 }
 
-export function isInviteUsable(db: DB, token: string, now: Date = new Date()): boolean {
+export async function isInviteUsable(db: DB, token: string, now: Date = new Date()): Promise<boolean> {
   if (!TOKEN_FORMAT.test(token)) return false;
-  const row = db
+  const rows = await db
     .select({ id: invite.id })
     .from(invite)
-    .where(and(eq(invite.tokenHash, hashToken(token)), usable(now)))
-    .get();
-  return Boolean(row);
+    .where(and(eq(invite.tokenHash, hashToken(token)), usable(now)));
+  return rows.length > 0;
 }
 
 /** Uses up one use of the invite. A single UPDATE, so concurrent sign-ups cannot exceed `maxUses`. */
-export function consumeInvite(db: DB, token: string, now: Date = new Date()): boolean {
+export async function consumeInvite(db: DB, token: string, now: Date = new Date()): Promise<boolean> {
   if (!TOKEN_FORMAT.test(token)) return false;
-  const row = db
+  const rows = await db
     .update(invite)
     .set({ uses: sql`${invite.uses} + 1` })
     .where(and(eq(invite.tokenHash, hashToken(token)), usable(now)))
-    .returning({ id: invite.id })
-    .get();
-  return Boolean(row);
+    .returning({ id: invite.id });
+  return rows.length > 0;
 }

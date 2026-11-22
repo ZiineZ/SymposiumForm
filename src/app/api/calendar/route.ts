@@ -7,7 +7,7 @@ export async function GET() {
   const user = await getCurrentUser();
   if (!user) return new Response("Unauthorized", { status: 401 });
 
-  const events: EventAttributes[] = getScheduleRows(user.id).map((r) => ({
+  const events: EventAttributes[] = (await getScheduleRows(user.id)).map((r) => ({
     uid: `${r.key}@lustrum-symposium.gewis.nl`,
     title: r.speaker ? `${r.title} – ${r.speaker}` : r.title,
     start: r.startsAt.getTime(),

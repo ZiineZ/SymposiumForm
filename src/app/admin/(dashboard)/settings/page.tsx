@@ -5,8 +5,8 @@ import { SettingsForm } from "./settings-form";
 
 export const metadata: Metadata = { title: "Settings" };
 
-export default function AdminSettingsPage() {
-  const s = getSettings();
+export default async function AdminSettingsPage() {
+  const s = await getSettings();
   return (
     <SettingsForm
       opensAt={toLocalInput(s.registrationOpensAt)}

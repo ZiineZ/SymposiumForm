@@ -7,7 +7,7 @@ import { ConfirmButton, EmptyState, Field, FormDialog, Hidden, TimeFields } from
 import { PageHeader } from "@/components/page-header";
 import type { getAdminPlenary } from "@/lib/admin-data";
 
-type Item = ReturnType<typeof getAdminPlenary>[number];
+type Item = Awaited<ReturnType<typeof getAdminPlenary>>[number];
 
 function ItemFields({ item }: { item?: Item }) {
   return (

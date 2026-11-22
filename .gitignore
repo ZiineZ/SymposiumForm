@@ -43,3 +43,10 @@ next-env.d.ts
 # local database
 /data/
 !.env.example
+
+# bundled scripts for the container image
+/dist/
+
+# plain-text Kubernetes secrets and sealing cert
+/deploy/kustomize/secrets/symposium-secrets.yaml
+/deploy/kustomize/secrets/cert.pem

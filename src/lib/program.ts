@@ -48,13 +48,12 @@ function mySlots(userId: string) {
     })
     .from(enrollment)
     .innerJoin(timeslot, eq(enrollment.timeslotId, timeslot.id))
-    .where(eq(enrollment.userId, userId))
-    .all();
+    .where(eq(enrollment.userId, userId));
 }
 
-export function getSpeakers(userId: string): SpeakerView[] {
-  const speakers = db.select().from(speaker).orderBy(asc(speaker.sortOrder), asc(speaker.name)).all();
-  const slots = db
+export async function getSpeakers(userId: string): Promise<SpeakerView[]> {
+  const speakers = await db.select().from(speaker).orderBy(asc(speaker.sortOrder), asc(speaker.name));
+  const slots = await db
     .select({
       id: timeslot.id,
       speakerId: timeslot.speakerId,
@@ -67,9 +66,8 @@ export function getSpeakers(userId: string): SpeakerView[] {
     .from(timeslot)
     .leftJoin(enrollment, eq(enrollment.timeslotId, timeslot.id))
     .groupBy(timeslot.id)
-    .orderBy(asc(timeslot.startsAt))
-    .all();
-  const mine = mySlots(userId);
+    .orderBy(asc(timeslot.startsAt));
+  const mine = await mySlots(userId);
 
   const stateOf = (s: (typeof slots)[number]): SlotState => {
     if (mine.some((m) => m.id === s.id)) return "enrolled";
@@ -99,8 +97,8 @@ export function getSpeakers(userId: string): SpeakerView[] {
 }
 
 /** Raw schedule rows, used by both the page and the calendar export. */
-export function getScheduleRows(userId: string) {
-  const talks = db
+export async function getScheduleRows(userId: string) {
+  const talkRows = await db
     .select({
       id: timeslot.id,
       startsAt: timeslot.startsAt,
@@ -112,21 +110,23 @@ export function getScheduleRows(userId: string) {
     .from(enrollment)
     .innerJoin(timeslot, eq(enrollment.timeslotId, timeslot.id))
     .innerJoin(speaker, eq(timeslot.speakerId, speaker.id))
-    .where(eq(enrollment.userId, userId))
-    .all()
-    .map((t) => ({ ...t, key: `talk-${t.id}`, kind: "talk" as const }));
+    .where(eq(enrollment.userId, userId));
+  const talks = talkRows.map((t) => ({ ...t, key: `talk-${t.id}`, kind: "talk" as const }));
 
-  const plenary = db
-    .select()
-    .from(agendaItem)
-    .all()
-    .map((a) => ({ ...a, key: `plenary-${a.id}`, speaker: undefined, kind: "plenary" as const }));
+  const plenary = (await db.select().from(agendaItem)).map((a) => ({
+    ...a,
+    key: `plenary-${a.id}`,
+    speaker: undefined,
+    kind: "plenary" as const,
+  }));
 
   return [...talks, ...plenary].sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
 }
 
-export function getSchedule(userId: string): { day: string | null; items: ScheduleItem[]; talks: number } {
-  const rows = getScheduleRows(userId);
+export async function getSchedule(
+  userId: string,
+): Promise<{ day: string | null; items: ScheduleItem[]; talks: number }> {
+  const rows = await getScheduleRows(userId);
   return {
     day: rows[0] ? formatDay(rows[0].startsAt) : null,
     talks: rows.filter((r) => r.kind === "talk").length,

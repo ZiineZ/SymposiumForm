@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: "Notifications" };
 
 export default async function NotificationsPage() {
   const user = await requireUser();
-  const notifications = getNotifications(user.id);
+  const notifications = await getNotifications(user.id);
 
   return (
     <>

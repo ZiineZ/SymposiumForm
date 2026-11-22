@@ -10,7 +10,7 @@ import { PageHeader } from "@/components/page-header";
 import type { getAdminInvites } from "@/lib/admin-data";
 import type { InviteStatus } from "@/lib/invites";
 
-type Invite = ReturnType<typeof getAdminInvites>[number];
+type Invite = Awaited<ReturnType<typeof getAdminInvites>>[number];
 
 const STATUS: Record<InviteStatus, { label: string; color: "success" | "default" | "danger" | "warning" }> = {
   active: { label: "Active", color: "success" },

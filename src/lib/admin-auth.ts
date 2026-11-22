@@ -47,8 +47,8 @@ export async function signInAdmin(username: string, password: string): Promise<A
 
   const h = await headers();
   const ip = `ip:${clientIp(h)}`;
-  const withinClient = registerAttempt(db, ip, THROTTLE.perClient);
-  const withinGlobal = registerAttempt(db, "global", THROTTLE.global);
+  const withinClient = await registerAttempt(db, ip, THROTTLE.perClient);
+  const withinGlobal = await registerAttempt(db, "global", THROTTLE.global);
   if (!withinClient || !withinGlobal) {
     console.warn(`[admin] sign-in throttled for ${ip}`);
     return "throttled";
@@ -59,21 +59,20 @@ export async function signInAdmin(username: string, password: string): Promise<A
     return "invalid";
   }
 
-  clearAttempts(db, ip);
+  await clearAttempts(db, ip);
   const token = randomBytes(32).toString("base64url");
   const now = new Date();
-  db.delete(adminSession)
-    .where(or(lt(adminSession.expiresAt, now), lt(adminSession.lastSeenAt, new Date(now.getTime() - IDLE_TTL_MS))))
-    .run();
-  db.insert(adminSession)
+  await db
+    .delete(adminSession)
+    .where(or(lt(adminSession.expiresAt, now), lt(adminSession.lastSeenAt, new Date(now.getTime() - IDLE_TTL_MS))));
+  await db.insert(adminSession)
     .values({
       id: sha256(token),
       createdAt: now,
       expiresAt: new Date(now.getTime() + ABSOLUTE_TTL_MS),
       lastSeenAt: now,
       userAgent: h.get("user-agent")?.slice(0, 300) ?? null,
-    })
-    .run();
+    });
 
   (await cookies()).set(ADMIN_COOKIE, token, {
     httpOnly: true,
@@ -92,16 +91,16 @@ export const getAdminSession = cache(async (): Promise<{ id: string } | null> =>
   if (!token || token.length > 128) return null;
 
   const id = sha256(token);
-  const row = db.select().from(adminSession).where(eq(adminSession.id, id)).get();
+  const [row] = await db.select().from(adminSession).where(eq(adminSession.id, id));
   if (!row) return null;
 
   const now = Date.now();
   if (row.expiresAt.getTime() <= now || now - row.lastSeenAt.getTime() > IDLE_TTL_MS) {
-    db.delete(adminSession).where(eq(adminSession.id, id)).run();
+    await db.delete(adminSession).where(eq(adminSession.id, id));
     return null;
   }
   if (now - row.lastSeenAt.getTime() > TOUCH_AFTER_MS) {
-    db.update(adminSession).set({ lastSeenAt: new Date(now) }).where(eq(adminSession.id, id)).run();
+    await db.update(adminSession).set({ lastSeenAt: new Date(now) }).where(eq(adminSession.id, id));
   }
   return { id };
 });
@@ -115,7 +114,7 @@ export async function requireAdmin() {
 
 export async function signOutAdmin() {
   const session = await getAdminSession();
-  if (session) db.delete(adminSession).where(eq(adminSession.id, session.id)).run();
+  if (session) await db.delete(adminSession).where(eq(adminSession.id, session.id));
   (await cookies()).delete(ADMIN_COOKIE);
 }
 

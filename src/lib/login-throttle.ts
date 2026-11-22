@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { DB } from "@/db/client";
 import { adminLoginAttempt } from "@/db/schema";
 
@@ -10,30 +10,25 @@ export const THROTTLE = {
 
 /**
  * Counts an attempt for `key` and reports whether it is still within `limit`
- * for the current fixed window. Counting happens before the password check,
- * so parallel requests cannot slip past the limit.
+ * for the current fixed window. One atomic upsert, done before the password
+ * check, so parallel requests cannot slip past the limit.
  */
-export function registerAttempt(db: DB, key: string, limit: number, now: number = Date.now()): boolean {
-  return db.transaction(
-    (tx) => {
-      const row = tx.select().from(adminLoginAttempt).where(eq(adminLoginAttempt.key, key)).get();
-      if (!row || now - row.windowStart >= THROTTLE.windowMs) {
-        tx.insert(adminLoginAttempt)
-          .values({ key, count: 1, windowStart: now })
-          .onConflictDoUpdate({ target: adminLoginAttempt.key, set: { count: 1, windowStart: now } })
-          .run();
-        return true;
-      }
-      tx.update(adminLoginAttempt)
-        .set({ count: row.count + 1 })
-        .where(eq(adminLoginAttempt.key, key))
-        .run();
-      return row.count + 1 <= limit;
-    },
-    { behavior: "immediate" },
-  );
+export async function registerAttempt(db: DB, key: string, limit: number, now: number = Date.now()): Promise<boolean> {
+  const expired = sql`${now} - ${adminLoginAttempt.windowStart} >= ${THROTTLE.windowMs}`;
+  const [row] = await db
+    .insert(adminLoginAttempt)
+    .values({ key, count: 1, windowStart: now })
+    .onConflictDoUpdate({
+      target: adminLoginAttempt.key,
+      set: {
+        count: sql`CASE WHEN ${expired} THEN 1 ELSE ${adminLoginAttempt.count} + 1 END`,
+        windowStart: sql`CASE WHEN ${expired} THEN ${now}::bigint ELSE ${adminLoginAttempt.windowStart} END`,
+      },
+    })
+    .returning({ count: adminLoginAttempt.count });
+  return row.count <= limit;
 }
 
-export function clearAttempts(db: DB, key: string) {
-  db.delete(adminLoginAttempt).where(eq(adminLoginAttempt.key, key)).run();
+export async function clearAttempts(db: DB, key: string) {
+  await db.delete(adminLoginAttempt).where(eq(adminLoginAttempt.key, key));
 }

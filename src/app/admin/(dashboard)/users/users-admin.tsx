@@ -8,7 +8,7 @@ import { ConfirmButton, EmptyState } from "@/components/admin/kit";
 import { PageHeader } from "@/components/page-header";
 import type { getAdminUsers } from "@/lib/admin-data";
 
-type User = ReturnType<typeof getAdminUsers>[number];
+type User = Awaited<ReturnType<typeof getAdminUsers>>[number];
 
 export function UsersAdmin({ users }: { users: User[] }) {
   const [query, setQuery] = useState("");

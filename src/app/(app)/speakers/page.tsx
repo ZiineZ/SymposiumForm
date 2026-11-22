@@ -11,10 +11,10 @@ export const metadata: Metadata = { title: "Speakers" };
 
 export default async function SpeakersPage() {
   const user = await requireUser();
-  const speakers = getSpeakers(user.id);
+  const speakers = await getSpeakers(user.id);
 
   const now = new Date();
-  const registration = getRegistrationWindow();
+  const registration = await getRegistrationWindow();
   const open = isRegistrationOpen(registration, now);
   const { opensAt, closesAt } = registration;
 

@@ -1,0 +1,23 @@
+# Applied by Flux from GEWIS/k8s-apps into the namespace symposium-prod.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+  - ingressroute.yaml
+  # Created by deploy/kustomize/secrets/seal.sh, see deploy/kustomize/README.md.
+  - sealed-secrets.yaml
+
+configMapGenerator:
+  - name: symposium-config
+    literals:
+      - BETTER_AUTH_URL=https://symposium.gewis.nl
+      - SMTP_HOST=smtp.gewis.nl
+      - SMTP_PORT=587
+      - MAIL_FROM=GEWIS Lustrum Symposium <lustrumsymposium@gewis.nl>
+      - DATABASE_POOL_MAX=10
+
+images:
+  # Pin a released tag (e.g. sha-abc1234) here to control exactly what runs.
+  - name: ghcr.io/ziinez/symposiumform
+    newTag: latest

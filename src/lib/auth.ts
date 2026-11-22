@@ -16,7 +16,7 @@ export const auth = betterAuth({
   secret: env.BETTER_AUTH_SECRET,
   trustedOrigins: [env.BETTER_AUTH_URL],
   database: drizzleAdapter(db, {
-    provider: "sqlite",
+    provider: "pg",
     schema: {
       user: schema.user,
       session: schema.session,
@@ -103,7 +103,7 @@ export const auth = betterAuth({
         // The token travels in a header; using it up is one atomic UPDATE.
         before: async (user, ctx) => {
           const token = ctx?.headers?.get("x-invite-token") ?? "";
-          if (ctx?.path !== "/sign-up/email" || !consumeInvite(db, token)) {
+          if (ctx?.path !== "/sign-up/email" || !(await consumeInvite(db, token))) {
             throw new APIError("BAD_REQUEST", {
               code: "INVALID_INVITE",
               message: "This invite link is invalid or has expired.",

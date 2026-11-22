@@ -5,7 +5,7 @@ import Link from "next/link";
 import { EmptyState, Fill } from "@/components/admin/kit";
 import type { getOverview } from "@/lib/admin-data";
 
-type Overview = ReturnType<typeof getOverview>;
+type Overview = Awaited<ReturnType<typeof getOverview>>;
 
 function Stat({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) {
   return (

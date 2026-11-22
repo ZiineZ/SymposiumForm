@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: "Create account", referrer: "no-refer
 export default async function JoinPage({ params }: PageProps<"/join/[token]">) {
   const { token } = await params;
 
-  if (!isInviteUsable(db, token)) {
+  if (!(await isInviteUsable(db, token))) {
     return (
       <AuthCard title="Link expired" footer={<TextLink href="/login">Back to sign in</TextLink>}>
         <FormAlert>This invite link is invalid or has expired. Ask the organisers for a new one.</FormAlert>

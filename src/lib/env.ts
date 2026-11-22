@@ -8,7 +8,9 @@ const optional = <T extends z.ZodType>(inner: T) =>
 const schema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-    DATABASE_PATH: z.string().min(1).default("./data/symposium.db"),
+    DATABASE_URL: z.string().regex(/^postgres(ql)?:\/\//, "must be a postgres:// connection string"),
+    // Keep small on serverless hosts, where every instance has its own pool.
+    DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(50).default(10),
     BETTER_AUTH_SECRET: z.string().min(32, "must be at least 32 characters"),
     BETTER_AUTH_URL: z.url(),
     SMTP_HOST: optional(z.string()),
@@ -43,7 +45,7 @@ const isBuild = process.env.NEXT_PHASE === "phase-production-build";
 const parsed = isBuild
   ? schema.safeParse({
       NODE_ENV: "test",
-      DATABASE_PATH: ":memory:",
+      DATABASE_URL: "postgres://build:build@localhost:5432/build",
       BETTER_AUTH_SECRET: "build-time-placeholder-not-used-at-runtime",
       BETTER_AUTH_URL: "http://localhost:3000",
     })

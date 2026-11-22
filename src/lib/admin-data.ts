@@ -20,9 +20,10 @@ function slotsWithCounts() {
     .from(timeslot)
     .leftJoin(enrollment, eq(enrollment.timeslotId, timeslot.id))
     .groupBy(timeslot.id)
-    .orderBy(asc(timeslot.startsAt))
-    .all();
+    .orderBy(asc(timeslot.startsAt));
 }
+
+type SlotRow = Awaited<ReturnType<typeof slotsWithCounts>>[number];
 
 export type AdminSlot = {
   id: number;
@@ -44,7 +45,7 @@ export type AdminSpeaker = {
   slots: AdminSlot[];
 };
 
-function toAdminSlot(s: ReturnType<typeof slotsWithCounts>[number]): AdminSlot {
+function toAdminSlot(s: SlotRow): AdminSlot {
   return {
     id: s.id,
     time: formatTimeRange(s.startsAt, s.endsAt),
@@ -57,31 +58,31 @@ function toAdminSlot(s: ReturnType<typeof slotsWithCounts>[number]): AdminSlot {
   };
 }
 
-export function getAdminSpeakers(): AdminSpeaker[] {
-  const slots = slotsWithCounts();
-  return db
-    .select()
-    .from(speaker)
-    .orderBy(asc(speaker.sortOrder), asc(speaker.name))
-    .all()
-    .map((sp) => ({
-      id: sp.id,
-      name: sp.name,
-      affiliation: sp.affiliation,
-      talkTitle: sp.talkTitle,
-      abstract: sp.abstract,
-      slots: slots.filter((s) => s.speakerId === sp.id).map(toAdminSlot),
-    }));
+export async function getAdminSpeakers(): Promise<AdminSpeaker[]> {
+  const [slots, speakers] = await Promise.all([
+    slotsWithCounts(),
+    db.select().from(speaker).orderBy(asc(speaker.sortOrder), asc(speaker.name)),
+  ]);
+  return speakers.map((sp) => ({
+    id: sp.id,
+    name: sp.name,
+    affiliation: sp.affiliation,
+    talkTitle: sp.talkTitle,
+    abstract: sp.abstract,
+    slots: slots.filter((s) => s.speakerId === sp.id).map(toAdminSlot),
+  }));
 }
 
-export function getOverview() {
-  const speakers = getAdminSpeakers();
+export async function getOverview() {
+  const [speakers, [users], [verified]] = await Promise.all([
+    getAdminSpeakers(),
+    db.select({ n: count() }).from(user),
+    db.select({ n: count() }).from(user).where(eq(user.emailVerified, true)),
+  ]);
   const slots = speakers.flatMap((sp) => sp.slots.map((s) => ({ ...s, speaker: sp.name, talkTitle: sp.talkTitle })));
-  const users = db.select({ n: count() }).from(user).get()?.n ?? 0;
-  const verified = db.select({ n: count() }).from(user).where(eq(user.emailVerified, true)).get()?.n ?? 0;
   return {
-    users,
-    verified,
+    users: users.n,
+    verified: verified.n,
     subscriptions: slots.reduce((sum, s) => sum + s.taken, 0),
     seats: slots.reduce((sum, s) => sum + s.capacity, 0),
     full: slots.filter((s) => s.taken >= s.capacity).length,
@@ -89,8 +90,8 @@ export function getOverview() {
   };
 }
 
-export function getSessionDetail(timeslotId: number) {
-  const row = db
+export async function getSessionDetail(timeslotId: number) {
+  const [row] = await db
     .select({
       id: timeslot.id,
       startsAt: timeslot.startsAt,
@@ -103,18 +104,15 @@ export function getSessionDetail(timeslotId: number) {
     })
     .from(timeslot)
     .innerJoin(speaker, eq(timeslot.speakerId, speaker.id))
-    .where(eq(timeslot.id, timeslotId))
-    .get();
+    .where(eq(timeslot.id, timeslotId));
   if (!row) return null;
 
-  const subscribers = db
+  const subscribers = await db
     .select({ id: user.id, name: user.name, email: user.email, subscribedAt: enrollment.createdAt })
     .from(enrollment)
     .innerJoin(user, eq(enrollment.userId, user.id))
     .where(eq(enrollment.timeslotId, timeslotId))
-    .orderBy(asc(enrollment.createdAt))
-    .all()
-    .map((s) => ({ ...s, subscribedAt: formatDateTime(s.subscribedAt) }));
+    .orderBy(asc(enrollment.createdAt));
 
   return {
     id: row.id,
@@ -125,62 +123,48 @@ export function getSessionDetail(timeslotId: number) {
     speaker: row.speaker,
     speakerId: row.speakerId,
     talkTitle: row.talkTitle,
-    subscribers,
+    subscribers: subscribers.map((s) => ({ ...s, subscribedAt: formatDateTime(s.subscribedAt) })),
   };
 }
 
-export function getAdminPlenary() {
-  return db
-    .select()
-    .from(agendaItem)
-    .orderBy(asc(agendaItem.startsAt))
-    .all()
-    .map((a) => ({
-      id: a.id,
-      title: a.title,
-      location: a.location,
-      time: formatTimeRange(a.startsAt, a.endsAt),
-      day: formatShortDay(a.startsAt),
-      startsAt: toLocalInput(a.startsAt),
-      endsAt: toLocalInput(a.endsAt),
-    }));
+export async function getAdminPlenary() {
+  const rows = await db.select().from(agendaItem).orderBy(asc(agendaItem.startsAt));
+  return rows.map((a) => ({
+    id: a.id,
+    title: a.title,
+    location: a.location,
+    time: formatTimeRange(a.startsAt, a.endsAt),
+    day: formatShortDay(a.startsAt),
+    startsAt: toLocalInput(a.startsAt),
+    endsAt: toLocalInput(a.endsAt),
+  }));
 }
 
-export function getAdminInvites() {
+export async function getAdminInvites() {
   const now = new Date();
-  return db
-    .select()
-    .from(invite)
-    .orderBy(desc(invite.createdAt), desc(invite.id))
-    .all()
-    .map((i) => ({
-      id: i.id,
-      label: i.label,
-      created: formatDateTime(i.createdAt),
-      expires: formatDateTime(i.expiresAt),
-      uses: i.uses,
-      maxUses: i.maxUses,
-      status: inviteStatus(i, now),
-    }));
+  const rows = await db.select().from(invite).orderBy(desc(invite.createdAt), desc(invite.id));
+  return rows.map((i) => ({
+    id: i.id,
+    label: i.label,
+    created: formatDateTime(i.createdAt),
+    expires: formatDateTime(i.expiresAt),
+    uses: i.uses,
+    maxUses: i.maxUses,
+    status: inviteStatus(i, now),
+  }));
 }
 
-export function getAdminUsers() {
-  const counts = db
-    .select({ userId: enrollment.userId, n: count() })
-    .from(enrollment)
-    .groupBy(enrollment.userId)
-    .all();
-  return db
-    .select()
-    .from(user)
-    .orderBy(asc(user.name))
-    .all()
-    .map((u) => ({
-      id: u.id,
-      name: u.name,
-      email: u.email,
-      verified: u.emailVerified,
-      created: formatDateTime(u.createdAt),
-      subscriptions: counts.find((c) => c.userId === u.id)?.n ?? 0,
-    }));
+export async function getAdminUsers() {
+  const [counts, users] = await Promise.all([
+    db.select({ userId: enrollment.userId, n: count() }).from(enrollment).groupBy(enrollment.userId),
+    db.select().from(user).orderBy(asc(user.name)),
+  ]);
+  return users.map((u) => ({
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    verified: u.emailVerified,
+    created: formatDateTime(u.createdAt),
+    subscriptions: counts.find((c) => c.userId === u.id)?.n ?? 0,
+  }));
 }

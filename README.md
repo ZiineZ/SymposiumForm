@@ -2,7 +2,7 @@
 
 Sign-up site for the GEWIS Lustrum Symposium (*Hidden Gems*, Evoluon). Attendees create an account through an invite link, see their personal schedule and subscribe to speaker sessions. Organisers run everything from an admin dashboard.
 
-**Stack:** Next.js 16 (App Router) · HeroUI v3 · Tailwind CSS v4 · Better Auth · Drizzle ORM · SQLite
+**Stack:** Next.js 16 (App Router) · HeroUI v3 · Tailwind CSS v4 · Better Auth · Drizzle ORM · PostgreSQL
 
 ## How it works
 
@@ -14,16 +14,19 @@ Sign-up site for the GEWIS Lustrum Symposium (*Hidden Gems*, Evoluon). Attendees
 
 ## Local development
 
+Needs Node 22+ and Docker (for Postgres and a local mail catcher).
+
 ```bash
 npm install
-cp .env.example .env.local          # fill in BETTER_AUTH_SECRET (openssl rand -base64 48)
+docker compose up -d                 # Postgres on :5432, Mailpit on :1025 / http://localhost:8025
+cp .env.example .env.local           # fill in BETTER_AUTH_SECRET (openssl rand -base64 48)
 npm run admin:credentials -- --save  # writes the two ADMIN_ hashes into .env.local
 npm run db:migrate
-npm run program:seed                # optional: load content/program.json
+npm run program:seed                 # optional: load content/program.json
 npm run dev
 ```
 
-Then sign in at `/admin/login`, create an invite link under **Invites**, and open it to create an attendee account. Without `SMTP_HOST`, verification and reset emails are printed to the dev server console.
+Then sign in at `/admin/login`, create an invite link under **Invites**, and open it to create an attendee account. Verification and reset emails land in Mailpit at http://localhost:8025.
 
 ## The admin account
 
@@ -56,18 +59,36 @@ There is one admin login, separate from attendee accounts and without an email a
 ```bash
 npm run lint
 npm run typecheck
-npm test
+npm test          # runs against an in-process Postgres (PGlite), no Docker needed
 npm run build
 ```
 
+The same checks run in GitHub Actions on every push and pull request.
+
 ## Deployment
 
-Run it as a long-lived Node server (`npm run build && npm start`), for example on a VPS or in a container, **not** on serverless hosting: the SQLite database is a local file.
+In production the app refuses to start without `DATABASE_URL`, `SMTP_HOST` and an `https://` `BETTER_AUTH_URL`. It must sit behind a proxy that sets `X-Real-Ip` (Traefik on the GEWIS cluster and Vercel both do); the rate limiters identify clients by that header.
 
-1. Set the environment variables from `.env.example` as real environment variables (the admin hashes belong in a secret). In production the app refuses to start without `SMTP_HOST` and an `https://` `BETTER_AUTH_URL`.
-2. Put `DATABASE_PATH` on persistent storage and back it up.
-3. Run `npm run db:migrate` on every deploy, before starting the server.
-4. Serve it behind a reverse proxy that terminates TLS and sets `X-Real-Ip` (Traefik on the GEWIS cluster does). The rate limiters identify clients by that header, so don't expose the Node port directly.
+### GEWIS cluster (production)
+
+- **Image:** `.github/workflows/container.yml` builds `ghcr.io/ziinez/symposiumform` (amd64 and arm64) on every push to `master`. The image runs as a non-root user and works with a read-only root filesystem.
+  - `node server.js` starts the app.
+  - `node dist/migrate.mjs` applies migrations.
+  - `/api/health` (liveness) and `/api/ready` (database reachable) are the probes.
+- **Manifests:** [`deploy/kustomize`](deploy/kustomize/README.md), with the steps for sealing secrets and releasing.
+- **Agreements with the CBC:** [`docs/gewis-deployment.md`](docs/gewis-deployment.md).
+
+### Vercel (temporary preview)
+
+1. Import the repository in Vercel. It runs `npm run vercel-build`, which applies migrations and builds.
+2. Add a Postgres database: Storage → Neon (free) → connect it to the project. This sets `DATABASE_URL`; use the pooled connection string.
+3. Set the other environment variables for Production:
+   - `BETTER_AUTH_SECRET` (`openssl rand -base64 48`)
+   - `BETTER_AUTH_URL` (`https://<project>.vercel.app`)
+   - `DATABASE_POOL_MAX=3`
+   - `ADMIN_USERNAME_SHA256` and `ADMIN_PASSWORD_HASH`
+   - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` and `MAIL_FROM`, from an SMTP provider allowed to send from that address
+4. Redeploy so the build sees the variables.
 
 ## Security
 
@@ -79,7 +100,7 @@ Run it as a long-lived Node server (`npm run build && npm start`), for example o
 - **Admin login** is separate from attendee accounts: hashed credentials from the environment, constant-time comparison, throttling, short server-side sessions. See *The admin account*.
 - **Notifications** are plain text rendered by React, so HTML in a message is shown, never executed.
 - **Input validation** with Zod on every Server Action. Database access goes through Drizzle's parameterised queries.
-- **Capacity** is enforced in an `IMMEDIATE` SQLite transaction, so two people can never take the last seat. Covered by `src/lib/enrollment.test.ts`.
+- **Capacity** is enforced in a Postgres transaction that locks the user's and the session's rows, so two people can never take the last seat and one person cannot double-book by clicking twice. Covered by `src/lib/enrollment.test.ts`.
 - **Headers:** a per-request nonce-based CSP (`strict-dynamic`, `frame-ancestors 'none'`), HSTS, `nosniff`, `Referrer-Policy`, `Permissions-Policy`, COOP/CORP. `X-Powered-By` is disabled.
 - **Email** is plain text only. Secrets are validated at startup and never sent to the client (`server-only` imports).
 - **Accepted trade-off:** `style-src` allows `'unsafe-inline'` because React Aria positions overlays with inline styles. Scripts stay nonce-only.

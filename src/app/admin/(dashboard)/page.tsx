@@ -5,9 +5,8 @@ import { formatDateTime } from "@/lib/format";
 import { getRegistrationWindow } from "@/lib/settings";
 import { OverviewView } from "./overview-view";
 
-export default function AdminOverviewPage() {
-  const overview = getOverview();
-  const registration = getRegistrationWindow();
+export default async function AdminOverviewPage() {
+  const [overview, registration] = await Promise.all([getOverview(), getRegistrationWindow()]);
   const now = new Date();
 
   let status: string;

@@ -100,18 +100,17 @@ export async function saveSpeaker(fd: FormData): Promise<AdminResult<{ id: numbe
   const { id: speakerId, ...values } = input;
 
   if (speakerId) {
-    const res = db.update(speaker).set(values).where(eq(speaker.id, speakerId)).run();
-    if (res.changes === 0) return fail("This speaker no longer exists.");
+    const updated = await db.update(speaker).set(values).where(eq(speaker.id, speakerId)).returning({ id: speaker.id });
+    if (updated.length === 0) return fail("This speaker no longer exists.");
     audit("speaker.update", { speakerId });
     return done({ id: speakerId });
   }
 
-  const order = db.select({ n: count() }).from(speaker).get()?.n ?? 0;
-  const created = db
+  const [{ n: order }] = await db.select({ n: count() }).from(speaker);
+  const [created] = await db
     .insert(speaker)
     .values({ ...values, slug: `speaker-${randomUUID()}`, sortOrder: order })
-    .returning({ id: speaker.id })
-    .get();
+    .returning({ id: speaker.id });
   audit("speaker.create", { speakerId: created.id });
   return done({ id: created.id });
 }
@@ -120,14 +119,14 @@ export async function deleteSpeaker(speakerId: number): Promise<AdminResult> {
   if (!(await isAdmin())) return EXPIRED;
   const sid = parse(id, speakerId);
   if (typeof sid === "string") return fail(sid);
-  db.transaction((tx) => {
-    const slots = tx.select({ id: timeslot.id }).from(timeslot).where(eq(timeslot.speakerId, sid)).all();
+  await db.transaction(async (tx) => {
+    const slots = await tx.select({ id: timeslot.id }).from(timeslot).where(eq(timeslot.speakerId, sid));
     const ids = slots.map((s) => s.id);
     if (ids.length) {
-      tx.delete(enrollment).where(inArray(enrollment.timeslotId, ids)).run();
-      tx.delete(timeslot).where(inArray(timeslot.id, ids)).run();
+      await tx.delete(enrollment).where(inArray(enrollment.timeslotId, ids));
+      await tx.delete(timeslot).where(inArray(timeslot.id, ids));
     }
-    tx.delete(speaker).where(eq(speaker.id, sid)).run();
+    await tx.delete(speaker).where(eq(speaker.id, sid));
   });
   audit("speaker.delete", { speakerId: sid });
   return done();
@@ -152,26 +151,28 @@ export async function saveSession(fd: FormData): Promise<AdminResult> {
   if (typeof input === "string") return fail(input);
   const { id: slotId, ...values } = input;
 
-  if (!db.select({ id: speaker.id }).from(speaker).where(eq(speaker.id, values.speakerId)).get()) {
-    return fail("This speaker no longer exists.");
-  }
+  const speakers = await db.select({ id: speaker.id }).from(speaker).where(eq(speaker.id, values.speakerId));
+  if (speakers.length === 0) return fail("This speaker no longer exists.");
 
   if (slotId) {
-    const taken = db.select({ n: count() }).from(enrollment).where(eq(enrollment.timeslotId, slotId)).get()?.n ?? 0;
-    if (values.capacity < taken) {
-      return fail(`Capacity cannot be lower than the ${taken} people already subscribed.`);
-    }
-    const res = db.update(timeslot).set(values).where(eq(timeslot.id, slotId)).run();
-    if (res.changes === 0) return fail("This session no longer exists.");
+    // Locks the timeslot row like subscribing does, so nobody subscribes in between the check and the update.
+    const error = await db.transaction(async (tx) => {
+      const [slot] = await tx.select({ id: timeslot.id }).from(timeslot).where(eq(timeslot.id, slotId)).for("update");
+      if (!slot) return "This session no longer exists.";
+      const [{ n: taken }] = await tx.select({ n: count() }).from(enrollment).where(eq(enrollment.timeslotId, slotId));
+      if (values.capacity < taken) return `Capacity cannot be lower than the ${taken} people already subscribed.`;
+      await tx.update(timeslot).set(values).where(eq(timeslot.id, slotId));
+      return null;
+    });
+    if (error) return fail(error);
     audit("session.update", { slotId });
     return done();
   }
 
-  const created = db
+  const [created] = await db
     .insert(timeslot)
     .values({ ...values, key: `slot-${randomUUID()}` })
-    .returning({ id: timeslot.id })
-    .get();
+    .returning({ id: timeslot.id });
   audit("session.create", { slotId: created.id });
   return done();
 }
@@ -180,9 +181,9 @@ export async function deleteSession(slotId: number): Promise<AdminResult> {
   if (!(await isAdmin())) return EXPIRED;
   const sid = parse(id, slotId);
   if (typeof sid === "string") return fail(sid);
-  db.transaction((tx) => {
-    tx.delete(enrollment).where(eq(enrollment.timeslotId, sid)).run();
-    tx.delete(timeslot).where(eq(timeslot.id, sid)).run();
+  await db.transaction(async (tx) => {
+    await tx.delete(enrollment).where(eq(enrollment.timeslotId, sid));
+    await tx.delete(timeslot).where(eq(timeslot.id, sid));
   });
   audit("session.delete", { slotId: sid });
   return done();
@@ -193,9 +194,7 @@ export async function removeSubscriber(slotId: number, userId: string): Promise<
   const sid = parse(id, slotId);
   const uid = parse(z.string().min(1).max(64), userId);
   if (typeof sid === "string" || typeof uid === "string") return fail("Invalid request.");
-  db.delete(enrollment)
-    .where(and(eq(enrollment.timeslotId, sid), eq(enrollment.userId, uid)))
-    .run();
+  await db.delete(enrollment).where(and(eq(enrollment.timeslotId, sid), eq(enrollment.userId, uid)));
   audit("subscription.remove", { slotId: sid, userId: uid });
   return done();
 }
@@ -219,13 +218,15 @@ export async function savePlenary(fd: FormData): Promise<AdminResult> {
   const { id: itemId, ...values } = input;
 
   if (itemId) {
-    const res = db.update(agendaItem).set(values).where(eq(agendaItem.id, itemId)).run();
-    if (res.changes === 0) return fail("This item no longer exists.");
+    const updated = await db
+      .update(agendaItem)
+      .set(values)
+      .where(eq(agendaItem.id, itemId))
+      .returning({ id: agendaItem.id });
+    if (updated.length === 0) return fail("This item no longer exists.");
     audit("plenary.update", { itemId });
   } else {
-    db.insert(agendaItem)
-      .values({ ...values, key: `plenary-${randomUUID()}` })
-      .run();
+    await db.insert(agendaItem).values({ ...values, key: `plenary-${randomUUID()}` });
     audit("plenary.create");
   }
   return done();
@@ -235,7 +236,7 @@ export async function deletePlenary(itemId: number): Promise<AdminResult> {
   if (!(await isAdmin())) return EXPIRED;
   const iid = parse(id, itemId);
   if (typeof iid === "string") return fail(iid);
-  db.delete(agendaItem).where(eq(agendaItem.id, iid)).run();
+  await db.delete(agendaItem).where(eq(agendaItem.id, iid));
   audit("plenary.delete", { itemId: iid });
   return done();
 }
@@ -248,7 +249,7 @@ export async function sendNotification(fd: FormData): Promise<AdminResult> {
   if (!(await isAdmin())) return EXPIRED;
   const input = parse(NotificationInput, fields(fd));
   if (typeof input === "string") return fail(input);
-  const created = db.insert(notification).values(input).returning({ id: notification.id }).get();
+  const [created] = await db.insert(notification).values(input).returning({ id: notification.id });
   audit("notification.send", { notificationId: created.id });
   return done();
 }
@@ -257,7 +258,7 @@ export async function deleteNotification(notificationId: number): Promise<AdminR
   if (!(await isAdmin())) return EXPIRED;
   const nid = parse(id, notificationId);
   if (typeof nid === "string") return fail(nid);
-  db.delete(notification).where(eq(notification.id, nid)).run();
+  await db.delete(notification).where(eq(notification.id, nid));
   audit("notification.delete", { notificationId: nid });
   return done();
 }
@@ -278,7 +279,7 @@ export async function createInviteLink(fd: FormData): Promise<AdminResult<{ url:
   if (!(await isAdmin())) return EXPIRED;
   const input = parse(InviteInput, { ...fields(fd), maxUses: fd.get("maxUses") ?? "" });
   if (typeof input === "string") return fail(input);
-  const token = createInvite(db, input);
+  const token = await createInvite(db, input);
   audit("invite.create", { label: input.label, maxUses: input.maxUses });
   // Built from the configured URL, never from request headers.
   return done({ url: new URL(`/join/${token}`, env.BETTER_AUTH_URL).toString() });
@@ -288,7 +289,7 @@ export async function revokeInvite(inviteId: number): Promise<AdminResult> {
   if (!(await isAdmin())) return EXPIRED;
   const iid = parse(id, inviteId);
   if (typeof iid === "string") return fail(iid);
-  db.update(invite).set({ revokedAt: new Date() }).where(eq(invite.id, iid)).run();
+  await db.update(invite).set({ revokedAt: new Date() }).where(eq(invite.id, iid));
   audit("invite.revoke", { inviteId: iid });
   return done();
 }
@@ -300,7 +301,7 @@ export async function deleteUser(userId: string): Promise<AdminResult> {
   const uid = parse(z.string().min(1).max(64), userId);
   if (typeof uid === "string") return fail(uid);
   // Sessions, accounts, subscriptions and read receipts cascade.
-  db.delete(user).where(eq(user.id, uid)).run();
+  await db.delete(user).where(eq(user.id, uid));
   audit("user.delete", { userId: uid });
   return done();
 }
@@ -325,7 +326,7 @@ export async function updateSettings(fd: FormData): Promise<AdminResult> {
   if (!(await isAdmin())) return EXPIRED;
   const input = parse(SettingsInput, fields(fd));
   if (typeof input === "string") return fail(input);
-  saveSettings(input);
+  await saveSettings(input);
   audit("settings.update", {
     opensAt: input.registrationOpensAt?.toISOString() ?? null,
     closesAt: input.registrationClosesAt?.toISOString() ?? null,

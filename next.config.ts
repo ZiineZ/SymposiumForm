@@ -18,8 +18,8 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
-  // Native module; keep it out of the server bundle.
-  serverExternalPackages: ["better-sqlite3"],
+  // Self-contained server for the container image (see Dockerfile). Other hosts build normally.
+  output: process.env.BUILD_STANDALONE === "1" ? "standalone" : undefined,
   turbopack: {
     rules: {
       "*.css": {

@@ -1,36 +1,35 @@
-import { sql } from "drizzle-orm";
-import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { bigint, boolean, index, integer, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
 
-const now = sql`(cast(unixepoch('subsecond') * 1000 as integer))`;
-const timestamp = (name: string) => integer(name, { mode: "timestamp_ms" });
+const ts = (name: string) => timestamp(name, { withTimezone: true, mode: "date" });
+const createdAt = () => ts("created_at").notNull().defaultNow();
+const updatedAt = () =>
+  ts("updated_at")
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date());
 
 /* -------------------------------------------------------------------------- */
 /* Better Auth tables                                                          */
 /* -------------------------------------------------------------------------- */
 
-export const user = sqliteTable("user", {
+export const user = pgTable("user", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
-  emailVerified: integer("email_verified", { mode: "boolean" }).notNull().default(false),
+  emailVerified: boolean("email_verified").notNull().default(false),
   image: text("image"),
-  createdAt: timestamp("created_at").notNull().default(now),
-  updatedAt: timestamp("updated_at")
-    .notNull()
-    .default(now)
-    .$onUpdate(() => new Date()),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
 });
 
-export const session = sqliteTable(
+export const session = pgTable(
   "session",
   {
     id: text("id").primaryKey(),
-    expiresAt: timestamp("expires_at").notNull(),
+    expiresAt: ts("expires_at").notNull(),
     token: text("token").notNull().unique(),
-    createdAt: timestamp("created_at").notNull().default(now),
-    updatedAt: timestamp("updated_at")
-      .notNull()
-      .$onUpdate(() => new Date()),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
     ipAddress: text("ip_address"),
     userAgent: text("user_agent"),
     userId: text("user_id")
@@ -40,7 +39,7 @@ export const session = sqliteTable(
   (t) => [index("session_user_id_idx").on(t.userId)],
 );
 
-export const account = sqliteTable(
+export const account = pgTable(
   "account",
   {
     id: text("id").primaryKey(),
@@ -52,47 +51,42 @@ export const account = sqliteTable(
     accessToken: text("access_token"),
     refreshToken: text("refresh_token"),
     idToken: text("id_token"),
-    accessTokenExpiresAt: timestamp("access_token_expires_at"),
-    refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
+    accessTokenExpiresAt: ts("access_token_expires_at"),
+    refreshTokenExpiresAt: ts("refresh_token_expires_at"),
     scope: text("scope"),
     password: text("password"),
-    createdAt: timestamp("created_at").notNull().default(now),
-    updatedAt: timestamp("updated_at")
-      .notNull()
-      .$onUpdate(() => new Date()),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
   },
   (t) => [index("account_user_id_idx").on(t.userId)],
 );
 
-export const verification = sqliteTable(
+export const verification = pgTable(
   "verification",
   {
     id: text("id").primaryKey(),
     identifier: text("identifier").notNull(),
     value: text("value").notNull(),
-    expiresAt: timestamp("expires_at").notNull(),
-    createdAt: timestamp("created_at").notNull().default(now),
-    updatedAt: timestamp("updated_at")
-      .notNull()
-      .default(now)
-      .$onUpdate(() => new Date()),
+    expiresAt: ts("expires_at").notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
   },
   (t) => [index("verification_identifier_idx").on(t.identifier)],
 );
 
-export const rateLimit = sqliteTable("rate_limit", {
+export const rateLimit = pgTable("rate_limit", {
   id: text("id").primaryKey(),
   key: text("key").notNull().unique(),
   count: integer("count").notNull(),
-  lastRequest: integer("last_request").notNull(),
+  lastRequest: bigint("last_request", { mode: "number" }).notNull(),
 });
 
 /* -------------------------------------------------------------------------- */
 /* Symposium tables                                                            */
 /* -------------------------------------------------------------------------- */
 
-export const speaker = sqliteTable("speaker", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const speaker = pgTable("speaker", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   slug: text("slug").notNull().unique(),
   name: text("name").notNull(),
   affiliation: text("affiliation").notNull(),
@@ -102,23 +96,23 @@ export const speaker = sqliteTable("speaker", {
 });
 
 /** One occurrence of a speaker's talk: a time, a room and a capacity. */
-export const timeslot = sqliteTable(
+export const timeslot = pgTable(
   "timeslot",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
     key: text("key").notNull().unique(),
     speakerId: integer("speaker_id")
       .notNull()
       .references(() => speaker.id, { onDelete: "restrict" }),
-    startsAt: timestamp("starts_at").notNull(),
-    endsAt: timestamp("ends_at").notNull(),
+    startsAt: ts("starts_at").notNull(),
+    endsAt: ts("ends_at").notNull(),
     location: text("location").notNull(),
     capacity: integer("capacity").notNull(),
   },
   (t) => [index("timeslot_speaker_id_idx").on(t.speakerId)],
 );
 
-export const enrollment = sqliteTable(
+export const enrollment = pgTable(
   "enrollment",
   {
     userId: text("user_id")
@@ -127,7 +121,7 @@ export const enrollment = sqliteTable(
     timeslotId: integer("timeslot_id")
       .notNull()
       .references(() => timeslot.id, { onDelete: "restrict" }),
-    createdAt: timestamp("created_at").notNull().default(now),
+    createdAt: createdAt(),
   },
   (t) => [
     primaryKey({ columns: [t.userId, t.timeslotId] }),
@@ -136,12 +130,12 @@ export const enrollment = sqliteTable(
 );
 
 /** Plenary programme items everyone attends (opening, lunch, drinks). */
-export const agendaItem = sqliteTable("agenda_item", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const agendaItem = pgTable("agenda_item", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   key: text("key").notNull().unique(),
   title: text("title").notNull(),
-  startsAt: timestamp("starts_at").notNull(),
-  endsAt: timestamp("ends_at").notNull(),
+  startsAt: ts("starts_at").notNull(),
+  endsAt: ts("ends_at").notNull(),
   location: text("location").notNull(),
 });
 
@@ -150,48 +144,48 @@ export const agendaItem = sqliteTable("agenda_item", {
 /* -------------------------------------------------------------------------- */
 
 /** Account-creation link. Only the SHA-256 of the token is stored. */
-export const invite = sqliteTable("invite", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const invite = pgTable("invite", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   tokenHash: text("token_hash").notNull().unique(),
   label: text("label").notNull(),
-  createdAt: timestamp("created_at").notNull().default(now),
-  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: createdAt(),
+  expiresAt: ts("expires_at").notNull(),
   maxUses: integer("max_uses"),
   uses: integer("uses").notNull().default(0),
-  revokedAt: timestamp("revoked_at"),
+  revokedAt: ts("revoked_at"),
 });
 
 /** Admin sessions. `id` is the SHA-256 of the cookie token. */
-export const adminSession = sqliteTable("admin_session", {
+export const adminSession = pgTable("admin_session", {
   id: text("id").primaryKey(),
-  createdAt: timestamp("created_at").notNull().default(now),
-  expiresAt: timestamp("expires_at").notNull(),
-  lastSeenAt: timestamp("last_seen_at").notNull(),
+  createdAt: createdAt(),
+  expiresAt: ts("expires_at").notNull(),
+  lastSeenAt: ts("last_seen_at").notNull(),
   userAgent: text("user_agent"),
 });
 
 /** Failed admin sign-ins per client (and one global key), per fixed window. */
-export const adminLoginAttempt = sqliteTable("admin_login_attempt", {
+export const adminLoginAttempt = pgTable("admin_login_attempt", {
   key: text("key").primaryKey(),
   count: integer("count").notNull(),
-  windowStart: integer("window_start").notNull(),
+  windowStart: bigint("window_start", { mode: "number" }).notNull(),
 });
 
 /** Single-row table (id = 1) with settings the admin can change. */
-export const setting = sqliteTable("setting", {
+export const setting = pgTable("setting", {
   id: integer("id").primaryKey(),
-  registrationOpensAt: timestamp("registration_opens_at"),
-  registrationClosesAt: timestamp("registration_closes_at"),
+  registrationOpensAt: ts("registration_opens_at"),
+  registrationClosesAt: ts("registration_closes_at"),
 });
 
-export const notification = sqliteTable("notification", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const notification = pgTable("notification", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   title: text("title").notNull(),
   body: text("body").notNull(),
-  createdAt: timestamp("created_at").notNull().default(now),
+  createdAt: createdAt(),
 });
 
-export const notificationRead = sqliteTable(
+export const notificationRead = pgTable(
   "notification_read",
   {
     userId: text("user_id")
@@ -200,7 +194,7 @@ export const notificationRead = sqliteTable(
     notificationId: integer("notification_id")
       .notNull()
       .references(() => notification.id, { onDelete: "cascade" }),
-    readAt: timestamp("read_at").notNull().default(now),
+    readAt: ts("read_at").notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.userId, t.notificationId] })],
 );

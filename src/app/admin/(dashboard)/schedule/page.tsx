@@ -4,6 +4,6 @@ import { ScheduleAdmin } from "./schedule-admin";
 
 export const metadata: Metadata = { title: "Schedule" };
 
-export default function AdminSchedulePage() {
-  return <ScheduleAdmin items={getAdminPlenary()} />;
+export default async function AdminSchedulePage() {
+  return <ScheduleAdmin items={await getAdminPlenary()} />;
 }

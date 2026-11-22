@@ -6,7 +6,7 @@ import { getNotifications } from "@/lib/notifications";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const user = await requireUser();
-  const unread = getNotifications(user.id).filter((n) => !n.read);
+  const unread = (await getNotifications(user.id)).filter((n) => !n.read);
 
   return (
     <>

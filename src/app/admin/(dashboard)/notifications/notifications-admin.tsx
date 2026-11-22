@@ -7,7 +7,7 @@ import { AreaField, ConfirmButton, EmptyState, Field, FormDialog } from "@/compo
 import { PageHeader } from "@/components/page-header";
 import type { getNotificationsForAdmin } from "@/lib/notifications";
 
-type Item = ReturnType<typeof getNotificationsForAdmin>[number];
+type Item = Awaited<ReturnType<typeof getNotificationsForAdmin>>[number];
 
 export function NotificationsAdmin({ notifications }: { notifications: Item[] }) {
   return (

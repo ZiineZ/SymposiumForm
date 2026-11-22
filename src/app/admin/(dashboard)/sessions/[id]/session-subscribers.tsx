@@ -8,7 +8,7 @@ import { ConfirmButton, EmptyState, Fill } from "@/components/admin/kit";
 import { PageHeader } from "@/components/page-header";
 import type { getSessionDetail } from "@/lib/admin-data";
 
-type Session = NonNullable<ReturnType<typeof getSessionDetail>>;
+type Session = NonNullable<Awaited<ReturnType<typeof getSessionDetail>>>;
 
 export function SessionSubscribers({ session }: { session: Session }) {
   async function copyEmails() {

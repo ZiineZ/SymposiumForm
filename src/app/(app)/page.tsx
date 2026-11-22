@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: "My schedule" };
 
 export default async function SchedulePage() {
   const user = await requireUser();
-  const schedule = getSchedule(user.id);
+  const schedule = await getSchedule(user.id);
 
   return (
     <>

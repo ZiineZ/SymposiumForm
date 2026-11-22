@@ -4,6 +4,6 @@ import { NotificationsAdmin } from "./notifications-admin";
 
 export const metadata: Metadata = { title: "Notifications" };
 
-export default function AdminNotificationsPage() {
-  return <NotificationsAdmin notifications={getNotificationsForAdmin()} />;
+export default async function AdminNotificationsPage() {
+  return <NotificationsAdmin notifications={await getNotificationsForAdmin()} />;
 }

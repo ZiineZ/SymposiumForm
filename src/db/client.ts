@@ -1,18 +1,23 @@
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+import { drizzle } from "drizzle-orm/node-postgres";
+import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
+import { Pool } from "pg";
 import * as schema from "./schema";
 
-/** Opens a SQLite database with safe defaults. Shared by the app, scripts and tests. */
-export function openDatabase(path: string) {
-  if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
-  const sqlite = new Database(path);
-  sqlite.pragma("journal_mode = WAL");
-  sqlite.pragma("foreign_keys = ON");
-  sqlite.pragma("busy_timeout = 5000");
-  sqlite.pragma("synchronous = NORMAL");
-  return drizzle({ client: sqlite, schema });
-}
+/** Any Drizzle Postgres database with this schema: node-postgres in the app, PGlite in tests. */
+export type DB = PgDatabase<PgQueryResultHKT, typeof schema>;
 
-export type DB = ReturnType<typeof openDatabase>;
+/**
+ * Opens a connection pool. TLS follows the URL, e.g. `?sslmode=verify-full`.
+ * Shared by the app and the scripts.
+ */
+export function openDatabase(url: string, max = 10) {
+  const pool = new Pool({
+    connectionString: url,
+    max,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 10_000,
+    application_name: "lustrum-symposium",
+  });
+  pool.on("error", (err) => console.error("[db] idle client error", err.message));
+  return { db: drizzle({ client: pool, schema }), pool };
+}
